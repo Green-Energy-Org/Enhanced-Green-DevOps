@@ -4,7 +4,8 @@ on:
   push:
     branches: [ "main" ]
     paths:
-      - 'calculator-python/**'  
+      - 'calculator-python/**'
+      - '.github/workflows/main.yml'
 
 jobs:
   build-and-test:
