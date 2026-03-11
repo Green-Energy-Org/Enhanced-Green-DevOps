@@ -1,10 +1,9 @@
-name: Calculator Service CI/CD
+name: Calculator Service CI/CD - Energy Optimized
 
 on:
   push:
-    branches:
-      - main
-  workflow_dispatch: # run jobs manually for testing
+    branches: [main]
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -12,27 +11,61 @@ jobs:
     defaults:
       run:
         working-directory: ./calculator-python
-        
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+
+      # 1. Initialisation globale
+      - name: Initialize Eco-CI
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: start-measurement
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      # 2. Mesure : Installation & Build
+      - name: Install & Build
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install ruff pytest
+          pip install -r requirements.txt ruff pytest
+          python -m compileall app/
           
-      - name: Build (Compile Bytecode)
-        run: python -m compileall app/
+      - name: Get Build Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Installation and Compile'
 
+      # 3. Mesure : Analyse Statique
       - name: Static Code Analysis (Ruff)
         run: ruff check .
 
+      - name: Get Linting Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Linter (Ruff)'
+
+      # 4. Mesure : Tests Unitaires
       - name: Unit Tests (Pytest)
         run: pytest tests/
+
+      - name: Get Test Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Tests (Pytest)'
+
+      # 5. Finalisation et Rapport
+      - name: Finalize & Display Results
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: display-results
+          # Pour voir les résultats sous forme de graphiques dans le dashboard Eco-CI
+          send-data: true 
+          # Crée un fichier de données pour usage ultérieur
+          export-json: true
