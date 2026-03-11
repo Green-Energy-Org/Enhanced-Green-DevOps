@@ -23,13 +23,13 @@ jobs:
           python-version: '3.10'
 
       - name: Install Dependencies
-        run: ../scripts/green_run.sh "Install_Deps" "pip install -r requirements.txt ruff pytest"
+        run: bash ../scripts/green_run.sh "Install_Deps" "pip install -r requirements.txt ruff pytest"
 
       - name: Build (Compile Bytecode)
-        run: ../scripts/green_run.sh "Compile" "python -m compileall app/"
+        run: bash ../scripts/green_run.sh "Compile" "python -m compileall app/"
 
       - name: Static Code Analysis (Ruff)
-        run: ../scripts/green_run.sh "Linter" "ruff check ."
+        run: bash ../scripts/green_run.sh "Linter" "ruff check ."
 
       - name: Unit Tests (Pytest)
-        run: ../scripts/green_run.sh "Pytest" "pytest tests/"
+        run: bash ../scripts/green_run.sh "Pytest" "pytest tests/"
