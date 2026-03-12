@@ -90,19 +90,19 @@ jobs:
         with:
           task: display-results
           send-data: true
-          branch-name: ${{ github.ref_name }}
-          export-json: true
-
+    
+          branch: ${{ github.ref_name }}
+          json-output: true     
+          calculate-co2: false   
+          
       - name: Check if file exists (Debug)
         run: |
           echo "Recherche du fichier dans tout le dossier du runner..."
           find . -name "energy-export.json"
 
       - name: Upload Energy Report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: energy-report-${{ github.run_id }}
-          path: |
-            **/energy-export.json
-            ./energy-export.json
-          if-no-files-found: warn
+          name: energy-report
+          path: "*.json" # Prend n'importe quel JSON généré
