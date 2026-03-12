@@ -95,4 +95,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: energy-metrics-report
-          path: ./calculator-python/energy-export.json
+          path: "**/energy-export.json"
