@@ -32,16 +32,16 @@ jobs:
           python-version: '3.10'
 
 
-      - name: Stress Test
-        run: |
-          chmod +x ../../stress-tests/stress_workload.sh
-          bash ../../stress-tests/stress_workload.sh
+      #- name: Stress Test
+        #run: |
+         # chmod +x ../../stress-tests/stress_workload.sh
+         # bash ../../stress-tests/stress_workload.sh
 
-      - name: Get Stress Metrics
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: get-measurement
-          label: 'Stress-Test-4-Cores'
+     # - name: Get Stress Metrics
+     #   uses: green-coding-solutions/eco-ci-energy-estimation@v4
+     #   with:
+      #    task: get-measurement
+       #   label: 'Stress-Test-4-Cores'
           
       - name: Install Dependencies
         run: |
