@@ -1,0 +1,63 @@
+name: CD
+
+on:
+  workflow_dispatch: # Permet de lancer le job manuellement sans commit
+
+jobs:
+  integration-test:
+    runs-on: self-hosted
+    steps:
+      - name: Initialize Eco-CI
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: start-measurement
+          geo-location: fr
+          carbon-intensity: 0
+
+      - name: Run Integration Test
+        env:
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
+          CONTAINER_NAME: calc-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          set -Eeuo pipefail
+          
+          # Port aléatoire pour éviter les collisions
+          PORT=$(shuf -i 20000-65000 -n 1)
+          
+          echo "Démarrage du conteneur $CONTAINER_NAME sur le port $PORT"
+          
+          # Nettoyage préventif
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+          
+          # Lancement simple (mappage sur port 8000 interne)
+          docker run -d \
+            --name $CONTAINER_NAME \
+            -p $PORT:8000 \
+            $IMAGE
+          
+          # Temps d'attente pour l'initialisation CPU
+          sleep 5
+          
+          # Vérification de l'état du conteneur
+          if [ "$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
+             echo "Conteneur démarré avec succès."
+          else
+             echo "Le conteneur a crashé au démarrage."
+             docker logs $CONTAINER_NAME
+             exit 1
+          fi
+
+      - name: Integration Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: "Docker Startup Energy"
+
+      - name: Finalize & Display Results
+        if: always()
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: display-results
+          calculate-co2: false
+
+   
