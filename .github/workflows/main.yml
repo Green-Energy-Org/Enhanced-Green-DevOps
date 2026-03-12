@@ -25,8 +25,7 @@ jobs:
         with:
           task: start-measurement
           geo-location: fr
-          env:
-          CO2_SIGNAL_API_KEY: ${{ secrets.CO2_SIGNAL_API_KEY }}
+          carbon-intensity: 0
 
       - name: Set up Python 3.10
         uses: actions/setup-python@v4
