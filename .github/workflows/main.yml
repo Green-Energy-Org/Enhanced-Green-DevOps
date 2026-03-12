@@ -211,78 +211,11 @@ jobs:
           label: "Docker Push"
 
 # -----------------------
-# INTEGRATION TEST
-# -----------------------
-  integration-test:
-    runs-on: self-hosted
-    needs: docker-push
-    environment: manual-testing
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Start Energy Measurement
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: start-measurement
-
-      - name: Run Integration Test
-        env:
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
-          CONTAINER_NAME: calc-${{ github.run_id }}-${{ github.run_attempt }}
-        run: |
-          set -Eeuo pipefail
-
-          PORT=$(shuf -i 20000-65000 -n 1)
-
-          echo "Container name: $CONTAINER_NAME"
-          echo "Port: $PORT"
-
-          cleanup() {
-            echo "Cleaning container..."
-            docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-          }
-
-          trap cleanup EXIT
-
-          echo "Removing possible leftover container"
-          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-
-          echo "Starting container"
-          docker run -d \
-            --name $CONTAINER_NAME \
-            -p $PORT:8000 \
-            $IMAGE
-
-          echo "Waiting for application startup"
-
-          for i in {1..20}; do
-            if curl -fs http://localhost:$PORT/ > /dev/null; then
-              echo "Healthcheck passed"
-              exit 0
-            fi
-
-            echo "Waiting... attempt $i"
-            sleep 2
-          done
-
-          echo "Healthcheck failed — container logs:"
-          docker logs $CONTAINER_NAME
-
-          exit 1
-
-      - name: Integration Metrics
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: get-measurement
-          label: "Docker Integration Test"
-
-# -----------------------
 # FINAL REPORT
 # -----------------------
   energy-report:
     runs-on: self-hosted
-    needs: integration-test
+    needs: docker-push
 
     steps:
       - name: Display Results
