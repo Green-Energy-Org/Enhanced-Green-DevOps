@@ -32,7 +32,6 @@ jobs:
         with:
           python-version: '3.10'
 
-      # On "nettoie" le compteur ici pour que Setup Python ne pollue pas l'Installation
       - name: Baseline Measurement
         uses: green-coding-solutions/eco-ci-energy-estimation@v4
         with:
@@ -77,13 +76,53 @@ jobs:
           task: get-measurement
           label: 'Tests (Pytest)'
 
+
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Docker Build
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest .
+
+      - name: Get Docker Build Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Docker Build'
+
+      - name: Docker Push
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
+
+      - name: Get Docker Push Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Docker Push'
+
+      - name: Docker Run (Integration Check)
+        run: |
+          docker run -d --name test-app -p 5000:5000 ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
+          sleep 10
+          curl http://localhost:5000/health || exit 1
+          docker stop test-app && docker rm test-app
+
+      - name: Get Docker Run Metrics
+        uses: green-coding-solutions/eco-ci-energy-estimation@v4
+        with:
+          task: get-measurement
+          label: 'Docker Run & Healthcheck'
+
+          
       - name: Finalize & Display Results
         if: always()
         uses: green-coding-solutions/eco-ci-energy-estimation@v4
         with:
           task: display-results
           send-data: true
-          branch: main # Bien aligné sous "with"
-          json-output: true # Bien aligné sous "with"
-          calculate-co2: false # Bien aligné sous "with"
+          branch: main 
+          json-output: true 
+          calculate-co2: false 
      
