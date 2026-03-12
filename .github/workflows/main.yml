@@ -250,7 +250,7 @@ jobs:
           echo "Starting container"
           docker run -d \
             --name $CONTAINER_NAME \
-            -p $PORT:5000 \
+            -p $PORT:8000 \
             $IMAGE
 
           echo "Waiting for application startup"
