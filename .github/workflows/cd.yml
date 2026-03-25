@@ -1,63 +1,68 @@
-name: CD
+name: CD PIPELINE - Integration & Deploy
 
 on:
-  workflow_dispatch: # Permet de lancer le job manuellement sans commit
+  workflow_dispatch:
+    inputs:
+      target_job:
+        description: 'Sélectionnez le job CD à exécuter'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - integration-test
+
+defaults:
+  run:
+    working-directory: ./chatbot
 
 jobs:
   integration-test:
+    if: github.event.inputs.target_job == 'integration-test' || github.event.inputs.target_job == 'all'
     runs-on: self-hosted
     steps:
-      - name: Initialize Eco-CI
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: start-measurement
-          geo-location: fr
-          carbon-intensity: 0
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-      - name: Run Integration Test
+      - name: Run Integration Test (Docker)
         env:
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/calculator-app:latest
-          CONTAINER_NAME: calc-${{ github.run_id }}-${{ github.run_attempt }}
+          # Mise à jour avec le nom d'image utilisé dans ton CI : devops-bot
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+          CONTAINER_NAME: devops-bot-test-${{ github.run_id }}
         run: |
           set -Eeuo pipefail
           
-          # Port aléatoire pour éviter les collisions
+          # 1. Port aléatoire pour éviter les collisions sur ton Latitude-5490
           PORT=$(shuf -i 20000-65000 -n 1)
-          
           echo "Démarrage du conteneur $CONTAINER_NAME sur le port $PORT"
           
-          # Nettoyage préventif
+          # 2. Nettoyage préventif
           docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
           
-          # Lancement simple (mappage sur port 8000 interne)
+          # 3. Lancement du conteneur (EcoFloc captera la consommation du démon Docker)
           docker run -d \
             --name $CONTAINER_NAME \
             -p $PORT:8000 \
             $IMAGE
           
-          # Temps d'attente pour l'initialisation CPU
-          sleep 5
+          # 4. Temps d'attente pour stabilisation (important pour tes courbes d'énergie)
+          sleep 10
           
-          # Vérification de l'état du conteneur
+          # 5. Vérification de l'état
           if [ "$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
-             echo "Conteneur démarré avec succès."
+             echo "Le Chatbot est opérationnel sur le port $PORT"
+             
+             # Optionnel : Tu pourrais ajouter un curl ici pour tester l'API
+             # curl http://localhost:$PORT/health || exit 1
           else
-             echo "Le conteneur a crashé au démarrage."
+             echo "Échec du démarrage du conteneur"
              docker logs $CONTAINER_NAME
              exit 1
           fi
 
-      - name: Integration Metrics
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: get-measurement
-          label: "Docker Startup Energy"
-
-      - name: Finalize & Display Results
+      - name: Cleanup Test Container
         if: always()
-        uses: green-coding-solutions/eco-ci-energy-estimation@v4
-        with:
-          task: display-results
-          calculate-co2: false
-
-   
+        run: |
+          CONTAINER_NAME="devops-bot-test-${{ github.run_id }}"
+          echo "🧹 Nettoyage du conteneur $CONTAINER_NAME"
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
