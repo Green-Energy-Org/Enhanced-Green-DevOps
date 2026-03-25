@@ -6,11 +6,13 @@ from groq import Groq
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
 from langtrace_python_sdk import langtrace
+from dotenv import load_dotenv 
 
+load_dotenv()
 # ✅ Load env variables (works in Docker if env_file is used)
 LANGTRACE_API_KEY = os.getenv("LANGTRACE_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-LANGTRACE_HOST = os.getenv("LANGTRACE_HOST", "http://langtrace:3000/api/traces")
+LANGTRACE_HOST = os.getenv("LANGTRACE_HOST")
 
 # ✅ Init Langtrace BEFORE LLM
 langtrace.init(
