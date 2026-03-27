@@ -1,4 +1,4 @@
-name: CI PIPELINE
+name: CI/CD PIPELINE
 
 on:
   workflow_dispatch:
@@ -18,6 +18,7 @@ on:
           - build-artifact
           - docker-build
           - docker-push
+          - integration-test
 
 defaults:
   run:
@@ -123,3 +124,54 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+
+
+  integration-test:
+    if: github.event.inputs.target_job == 'integration-test' || github.event.inputs.target_job == 'all'
+    runs-on: self-hosted
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Integration Test
+        env:
+          # Mise à jour avec le nom d'image utilisé dans ton CI : devops-bot
+          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+          CONTAINER_NAME: devops-bot-test-${{ github.run_id }}
+        run: |
+          set -Eeuo pipefail
+          
+          # 1. Port aléatoire pour éviter les collisions sur ton Latitude-5490
+          PORT=$(shuf -i 20000-65000 -n 1)
+          echo "Démarrage du conteneur $CONTAINER_NAME sur le port $PORT"
+          
+          # 2. Nettoyage préventif
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+          
+          # 3. Lancement du conteneur
+          docker run -d \
+            --name $CONTAINER_NAME \
+            -p $PORT:8000 \
+            $IMAGE
+          
+          # 4. Temps d'attente pour stabilisation
+          sleep 10
+          
+          # 5. Vérification de l'état
+          if [ "$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
+             echo "Le Chatbot est opérationnel sur le port $PORT"
+             
+             # curl http://localhost:$PORT/health || exit 1
+          else
+             echo "Échec du démarrage du conteneur"
+             docker logs $CONTAINER_NAME
+             exit 1
+          fi
+
+      - name: Cleanup Test Container
+        if: always()
+        run: |
+          CONTAINER_NAME="devops-bot-test-${{ github.run_id }}"
+          echo "🧹 Nettoyage du conteneur $CONTAINER_NAME"
+          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+
