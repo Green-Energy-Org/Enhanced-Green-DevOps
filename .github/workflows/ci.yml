@@ -23,6 +23,12 @@ defaults:
   run:
     working-directory: ./chatbot
 
+
+env:
+  PROJECT_NAME: "Chatbot-LLM"
+  PROJECT_CATEGORY: "IA"
+
+  
 jobs:
 # 1. SETUP - Préparation de l'environnement
   setup:
