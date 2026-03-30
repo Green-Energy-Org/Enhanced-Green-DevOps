@@ -1,5 +1,4 @@
-name: CD PIPELINE - Integration & Deploy
-
+name: CD PIPELINE 
 on:
   workflow_dispatch:
     inputs:
@@ -10,59 +9,29 @@ on:
         type: choice
         options:
           - all
-          - integration-test
+          - burn-test
 
 defaults:
   run:
     working-directory: ./chatbot
 
 jobs:
-  integration-test:
+  burn-test:
     if: github.event.inputs.target_job == 'integration-test' || github.event.inputs.target_job == 'all'
     runs-on: self-hosted
     steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        with:
+          driver: docker-container 
       - name: Checkout Code
         uses: actions/checkout@v4
-
-      - name: Run Integration Test (Docker)
-        env:
-          # Mise à jour avec le nom d'image utilisé dans ton CI : devops-bot
-          IMAGE: ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
-          CONTAINER_NAME: devops-bot-test-${{ github.run_id }}
+        # Test de validation Green-DevOps
+      - name: Docker Burn Test
         run: |
-          set -Eeuo pipefail
-          
-          # 1. Port aléatoire pour éviter les collisions sur ton Latitude-5490
-          PORT=$(shuf -i 20000-65000 -n 1)
-          echo "Démarrage du conteneur $CONTAINER_NAME sur le port $PORT"
-          
-          # 2. Nettoyage préventif
-          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-          
-          # 3. Lancement du conteneur (EcoFloc captera la consommation du démon Docker)
-          docker run -d \
-            --name $CONTAINER_NAME \
-            -p $PORT:8000 \
-            $IMAGE
-          
-          # 4. Temps d'attente pour stabilisation (important pour tes courbes d'énergie)
-          sleep 10
-          
-          # 5. Vérification de l'état
-          if [ "$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
-             echo "Le Chatbot est opérationnel sur le port $PORT"
-             
-             # Optionnel : Tu pourrais ajouter un curl ici pour tester l'API
-             # curl http://localhost:$PORT/health || exit 1
-          else
-             echo "Échec du démarrage du conteneur"
-             docker logs $CONTAINER_NAME
-             exit 1
-          fi
-
-      - name: Cleanup Test Container
-        if: always()
-        run: |
-          CONTAINER_NAME="devops-bot-test-${{ github.run_id }}"
-          echo "🧹 Nettoyage du conteneur $CONTAINER_NAME"
-          docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
+          docker run --rm python:3.9-slim python3 -c "
+          import time
+          start = time.time()
+          while time.time() - start < 30: # Brûle du CPU pendant 30s
+            [x**2 for x in range(5000)]
+          "
