@@ -4,3 +4,4 @@ groq
 prometheus-client
 langtrace-python-sdk
 pydantic
+python-dotenv
