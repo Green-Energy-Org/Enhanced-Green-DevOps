@@ -2,7 +2,7 @@
 # ==============================================================================
 # hook_stop.sh — Calculateur d'Énergie Triple-Niveau (Composant, Job, Pipeline)
 # ==============================================================================
-
+set +e
 exec >> /tmp/runner_hooks.log 2>&1
 
 # --- 1. Contexte ---
@@ -27,7 +27,7 @@ mkdir -p "$JOB_METRICS_DIR" "$ML_DIR" "$PIPELINE_DIR"
 
 PID_FILE="/tmp/ecofloc_${PIPELINE_ID}_${JOB_NAME}.pids"
 START_TS_FILE="/tmp/ecofloc_${PIPELINE_ID}_${JOB_NAME}_start.ts"
-
+CONTAINER_PID_FILE="/tmp/ecofloc_${PIPELINE_ID}_${JOB_NAME}.cid"
 # --- 3. Fonctions de Calcul ---
 fadd() { echo "scale=6; ${1:-0} + ${2:-0}" | bc 2>/dev/null || echo "0"; }
 
@@ -83,12 +83,41 @@ parse_ecofloc() {
 
 # --- 4. Calcul de l'énergie du Job ---
 if [ -f "$PID_FILE" ]; then
+    echo "🛑 Arrêt des sondes..."
     while read pid; do sudo kill -2 "$pid" 2>/dev/null; done < "$PID_FILE"
-    sleep 2 
+    sleep 3 # Temps de flush crucial pour l'écriture des CSV
 
     DURATION=$(( $(date +%s) - $(cat "$START_TS_FILE") ))
     TS_LABEL=$(date '+%Y-%m-%d %H:%M:%S')
 
+# --- CALCUL ET AFFICHAGE DÉTAILLÉ (NOUVEAU) ---
+    D_PID_ACTUAL=$(cat "$CONTAINER_PID_FILE" 2>/dev/null)
+
+    echo "======================================================="
+    echo "📊 RAPPORT ÉNERGÉTIQUE DÉTAILLÉ (PROD vs DOCKER)"
+    echo "======================================================="
+
+    for mod in CPU RAM SD NIC GPU; do
+        # Mesure Runner pur
+        R_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_COMM_Runner.Worker*.csv 2>/dev/null | head -1)
+        R_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {print s+0}' "$R_FILE" 2>/dev/null || echo "0")
+
+        # Mesure Docker pur
+        D_J=0
+        if [ -n "$D_PID_ACTUAL" ]; then
+            D_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_PID_*.csv 2>/dev/null | head -1)
+            D_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {print s+0}' "$D_FILE" 2>/dev/null || echo "0")
+        fi
+
+        TOTAL_MOD=$(echo "$R_J + $D_J" | bc)
+        
+        echo "🔹 $mod :"
+        echo "   [Host Runner] : $R_J J"
+        echo "   [Docker/App ] : $D_J J"
+        echo "   => Total $mod : $TOTAL_MOD J"
+    done
+    echo "======================================================="
+# --- 5. Agrégation pour les Bases de Données ---
     read cpu_w cpu_j cpu_n <<< $(parse_ecofloc "CPU")
     read ram_w ram_j ram_n <<< $(parse_ecofloc "RAM")
     read sd_w  sd_j  sd_n  <<< $(parse_ecofloc "SD")
@@ -152,5 +181,5 @@ if [ -f "$PID_FILE" ]; then
 
     echo "🏁 [STOP] Job $JOB_NAME : $JOB_TOTAL_J J | Total Pipeline provisoire : $NEW_SUM J"
 
-    sudo rm -f "$PID_FILE" "$START_TS_FILE" "${RAW_DIR}/ECOFLOC_"*.csv
+    sudo rm -f "$PID_FILE" "$START_TS_FILE" "$CONTAINER_PID_FILE" "${RAW_DIR}/ECOFLOC_"*.csv
 fi
