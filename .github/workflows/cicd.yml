@@ -103,59 +103,29 @@ jobs:
           path: chatbot/dist/chatbot-artifact.tar.gz
           retention-days: 1
 
-# 7. DOCKER-BUILD - Création de l'image avec Buildx
+ # 7. DOCKER-BUILD simplifié pour ton Runner local
   docker-build:
-    needs: [build-artifact]
-    if: always() && (github.event.inputs.target_job == 'docker-build' || github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+      - name: Build Local Image
+        run: |
+         # Pas de buildx, pas de driver container
+         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest -f ./chatbot/Dockerfile ./chatbot
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        with:
-          # On force le driver docker-container pour garantir que Buildkit 
-          # tourne dans un conteneur isolable par ton Watcher
-          driver: docker-container
-
-      - name: Build and Load
-        uses: docker/build-push-action@v5
-        with:
-          context: ./chatbot
-          file: ./chatbot/Dockerfile
-          load: true # Charge l'image localement sur ton Latitude pour le push suivant
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
-          # On utilise le cache interne de Buildx pour plus de rapidité
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-# 8. DOCKER-PUSH - Envoi
+# 8. DOCKER-PUSH simplifié
   docker-push:
-    needs: [docker-build]
-    if: always() && (github.event.inputs.target_job == 'docker-push' || github.event.inputs.target_job == 'all')
     runs-on: self-hosted
+    needs: [docker-build]
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
-
-      - name: Login to DockerHub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Build and Push
-        uses: docker/build-push-action@v5
-        with:
-          context: ./chatbot
-          file: ./chatbot/Dockerfile
-          push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+      - name: Login and Push
+        run: |
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
 
 # 9. INTEGRATION-TEST - Validation dynamique
   integration-test:
-    needs: [docker-build]
+    needs: [docker-build,docker-push]
     if: always() && (github.event.inputs.target_job == 'integration-test' || github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
