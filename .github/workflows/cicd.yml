@@ -111,7 +111,7 @@ jobs:
       - name: Build Local Image
         run: |
          # Pas de buildx, pas de driver container
-         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest -f ./chatbot/Dockerfile ./chatbot
+         docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest .
 
 # 8. DOCKER-PUSH simplifié
   docker-push:
