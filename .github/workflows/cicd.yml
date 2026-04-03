@@ -113,7 +113,7 @@ jobs:
          # Supprime l'image spécifique (remplace par ton nom d'image)
           docker rmi -f devops-bot:latest 2>/dev/null || true
           docker builder prune -f --filter "until=24h"
-          docker build -t --no-cache ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest .
+          docker build --no-cache -t  ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest .
 
 # 8. DOCKER-PUSH simplifié
   docker-push:
