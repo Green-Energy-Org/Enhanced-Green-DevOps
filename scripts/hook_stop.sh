@@ -105,7 +105,8 @@ if [ -f "$PID_FILE" ]; then
         # Mesure Docker pur
         D_J=0
         if [ -n "$D_PID_ACTUAL" ]; then
-            D_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_PID_*.csv 2>/dev/null | head -1)
+            # On cherche n'importe quel fichier qui n'est pas le Runner (donc lié au PID Docker/Cgroup)
+            D_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_PID_*.csv 2>/dev/null | grep -v "Runner.Worker" | head -1)
             D_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {print s+0}' "$D_FILE" 2>/dev/null || echo "0")
         fi
 
