@@ -122,8 +122,8 @@ jobs:
     steps:
       - name: Login and Push
         run: |
-          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+              docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
 
 # 9. INTEGRATION-TEST - Validation dynamique
   integration-test:
