@@ -31,87 +31,58 @@ CONTAINER_PID_FILE="/tmp/ecofloc_${PIPELINE_ID}_${JOB_NAME}.cid"
 # --- 3. Fonctions de Calcul ---
 fadd() { echo "scale=6; ${1:-0} + ${2:-0}" | bc 2>/dev/null || echo "0"; }
 
-#parse_ecofloc() {
-#    local mod=$1
-#    local csv=$(sudo ls "${RAW_DIR}/ECOFLOC_${mod}_COMM_Runner.Worker"*.csv 2>/dev/null | head -1)
- #   if [ -n "$csv" ] && [ -s "$csv" ]; then
-  #      sudo awk -F',' -v f="$csv" '/^[0-9]/ { sum_p+=$3; sum_e+=$4; n++ } END { if (n>0) printf "%.4f %.4f %d %s", sum_p/n, sum_e, n, f; else printf "0.0000 0.0000 0 none"; }' "$csv"
-   # else echo "0.0000 0.0000 0 none"; fi
-#}
+# --- 3. Fonctions de Calcul (Version Unifiée dockerd) ---
 parse_ecofloc() {
     local mod=$1
-    local total_w=0
     local total_j=0
+    local total_w=0
     local total_n=0
 
-    # 1. Récupérer le fichier du RUNNER (Toujours présent)
-    # On cherche le fichier qui contient "Runner.Worker" dans son nom
+    # 1. Récupérer le fichier du RUNNER
     local runner_csv=$(sudo ls "${RAW_DIR}/ECOFLOC_${mod}_COMM_Runner.Worker"*.csv 2>/dev/null | head -1)
-    
     if [ -n "$runner_csv" ] && [ -s "$runner_csv" ]; then
-        # Extraire les données du Runner
         read r_w r_j r_n <<< $(sudo awk -F',' '/^[0-9]/ { sum_p+=$3; sum_e+=$4; n++ } END { if (n>0) printf "%.4f %.4f %d", sum_p/n, sum_e, n; else printf "0 0 0"; }' "$runner_csv")
-        total_w=$r_w
-        total_j=$r_j
-        total_n=$r_n
+        total_j=$(echo "$total_j + $r_j" | bc)
+        total_w=$(echo "$total_w + $r_w" | bc)
+        total_n=$((total_n + r_n))
     fi
 
-    # 2. Récupérer le fichier du CONTENEUR (Si existant)
-    # On cherche un fichier qui contient "PID" dans son nom (spécifique à l'instance Docker)
-    local docker_csv=$(sudo ls "${RAW_DIR}/ECOFLOC_${mod}_PID_"*.csv 2>/dev/null | head -1)
-
+    # 2. Récupérer le fichier de DOCKER (Nouvelle méthode : COMM_dockerd)
+    # EcoFloc génère ce nom via l'option -n "dockerd"
+    local docker_csv=$(sudo ls "${RAW_DIR}/ECOFLOC_${mod}_COMM_dockerd"*.csv 2>/dev/null | head -1)
+    
     if [ -n "$docker_csv" ] && [ -s "$docker_csv" ]; then
-        # Extraire les données du Conteneur
         read d_w d_j d_n <<< $(sudo awk -F',' '/^[0-9]/ { sum_p+=$3; sum_e+=$4; n++ } END { if (n>0) printf "%.4f %.4f %d", sum_p/n, sum_e, n; else printf "0 0 0"; }' "$docker_csv")
-        
-        # AJOUTER les mesures au total du job
-        # Énergie : Addition simple des Joules
         total_j=$(echo "scale=4; $total_j + $d_j" | bc)
-        # Puissance : Moyenne des deux puissances 
         total_w=$(echo "scale=4; $total_w + $d_w" | bc)
-        # Échantillons : On prend le max ou la somme (ici la somme pour le debug)
         total_n=$((total_n + d_n))
-        
-        echo "  [DEBUG] Fusion Docker détectée pour $mod : +$d_j Joules" >&2
+        echo "  [DEBUG] Fusion dockerd détectée pour $mod : +$d_j Joules" >&2
     fi
 
-    # 3. Retourner le résultat fusionné
     printf "%.4f %.4f %d" "$total_w" "$total_j" "$total_n"
 }
-
-
 
 # --- 4. Calcul de l'énergie du Job ---
 if [ -f "$PID_FILE" ]; then
     echo "🛑 Arrêt des sondes..."
     while read pid; do sudo kill -2 "$pid" 2>/dev/null; done < "$PID_FILE"
-    sleep 3 # Temps de flush crucial pour l'écriture des CSV
+    sleep 3 
 
-    DURATION=$(( $(date +%s) - $(cat "$START_TS_FILE") ))
-    TS_LABEL=$(date '+%Y-%m-%d %H:%M:%S')
-
-# --- CALCUL ET AFFICHAGE DÉTAILLÉ (NOUVEAU) ---
-    D_PID_ACTUAL=$(cat "$CONTAINER_PID_FILE" 2>/dev/null)
-
+    # --- CALCUL ET AFFICHAGE DÉTAILLÉ ---
     echo "======================================================="
     echo "📊 RAPPORT ÉNERGÉTIQUE DÉTAILLÉ (PROD vs DOCKER)"
     echo "======================================================="
 
     for mod in CPU RAM SD NIC GPU; do
-        # Mesure Runner pur
+        # Mesure Runner
         R_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_COMM_Runner.Worker*.csv 2>/dev/null | head -1)
-        R_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {print s+0}' "$R_FILE" 2>/dev/null || echo "0")
+        R_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {printf "%.2f", s+0}' "$R_FILE" 2>/dev/null || echo "0.00")
 
-        # Mesure Docker pur
-        D_J=0
-        if [ -n "$D_PID_ACTUAL" ]; then
-            # On cherche n'importe quel fichier qui n'est pas le Runner (donc lié au PID Docker/Cgroup)
-            D_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_PID_*.csv 2>/dev/null | grep -v "Runner.Worker" | head -1)
-            D_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {print s+0}' "$D_FILE" 2>/dev/null || echo "0")
-        fi
+        # Mesure Docker (Correction ici : on cherche COMM_dockerd)
+        D_FILE=$(sudo ls ${RAW_DIR}/ECOFLOC_${mod}_COMM_dockerd*.csv 2>/dev/null | head -1)
+        D_J=$(sudo awk -F',' '/^[0-9]/ {s+=$4} END {printf "%.2f", s+0}' "$D_FILE" 2>/dev/null || echo "0.00")
 
         TOTAL_MOD=$(echo "$R_J + $D_J" | bc)
-        
         echo "🔹 $mod :"
         echo "   [Host Runner] : $R_J J"
         echo "   [Docker/App ] : $D_J J"
