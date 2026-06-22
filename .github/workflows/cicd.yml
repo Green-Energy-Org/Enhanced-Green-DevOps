@@ -31,12 +31,19 @@ env:
   PROJECT_CATEGORY: "IA"
 
   
+  ENERGY_VOLUME: /home/mbensaid/energy-data
 jobs:
 # 1. SETUP - Préparation de l'environnement
   setup:
-    if: github.event.inputs.target_job == 'setup' || github.event.inputs.target_job == 'all'
+    if: github.event.inputs.target_job == 'setup' || 
+      github.event.inputs.target_job == 'all'
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
@@ -44,11 +51,18 @@ jobs:
       - run: python3 --version
 
 # 2. INSTALL - Dépendances
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   install:
     needs: [setup]
-    if: always() && (github.event.inputs.target_job == 'install' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'install' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
@@ -56,20 +70,34 @@ jobs:
       - run: pip install -r requirements.txt ruff pytest --break-system-packages
 
 # 3. LINT - Vérification de syntaxe 
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   lint:
     needs: [install]
-    if: always() && (github.event.inputs.target_job == 'lint' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'lint' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - run: /home/medyassine/.local/bin/ruff check .
 
 # 4. TEST - Vérification 
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   test:
     needs: [lint]
-    if: always() && (github.event.inputs.target_job == 'test' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'test' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -78,20 +106,34 @@ jobs:
           pytest tests/ || true
 
 # 5. BUILD - Compilation
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   build:
     needs: [test]
-    if: always() && (github.event.inputs.target_job == 'build' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'build' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - run: python3 -m compileall app/
 
 # 6. BUILD-ARTIFACT - Packaging
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   build-artifact:
     needs: [build]
-    if: always() && (github.event.inputs.target_job == 'build-artifact' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'build-artifact' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - name: Create Deployment Package
         run: |
@@ -105,34 +147,53 @@ jobs:
           retention-days: 1
 
  # 7. DOCKER-BUILD simplifié pour ton Runner local
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   docker-build:
     runs-on: self-hosted
     needs: [build-artifact]
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - uses: actions/checkout@v4
       - name: Build Local Image
         run: |
-         # Supprime l'image spécifique (remplace par ton nom d'image)
-          docker rmi -f devops-bot:latest 2>/dev/null || true
-          docker builder prune -f --filter "until=24h"
-          docker build --no-cache -t  ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest .
+          # Supprime l'image spécifique (remplace par ton nom d'image)
+           docker rmi -f devops-bot:latest 2>/dev/null || true
+           docker builder prune -f --filter "until=24h"
+           docker build --no-cache -t  ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest .
 
 # 8. DOCKER-PUSH simplifié
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   docker-push:
     runs-on: self-hosted
     needs: [docker-build]
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - name: Login and Push
         run: |
-              echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
-              docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
+          echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/devops-bot:latest
 
 # 9. INTEGRATION-TEST - Validation dynamique
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   integration-test:
     needs: [docker-push]
-    if: always() && (github.event.inputs.target_job == 'integration-test' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'integration-test' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -150,18 +211,18 @@ jobs:
           # Port aléatoire pour ton Latitude-5490
           PORT=$(shuf -i 20000-65000 -n 1)
           echo "Démarrage du conteneur $CONTAINER_NAME sur le port $PORT"
-          
+
           docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-          
+
           # Le Watcher va capturer cet événement 'start' instantanément !
           docker run -d \
             --name $CONTAINER_NAME \
             --env-file .env.docker \
             -p $PORT:8000 \
             $IMAGE
-          
+
           sleep 10
-          
+
           if [ "$(docker inspect -f '{{.State.Running}}' $CONTAINER_NAME)" == "true" ]; then
              echo "✅ Le Chatbot est opérationnel sur le port $PORT"
           else
@@ -177,13 +238,20 @@ jobs:
           CONTAINER_NAME="devops-bot-test-${{ github.run_id }}"
           echo "🧹 Nettoyage du conteneur $CONTAINER_NAME"
           docker rm -f $CONTAINER_NAME >/dev/null 2>&1 || true
-          
+
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
   deploy-minikube:
     name: "Deploy to Minikube"
     needs: [integration-test]
-    if: always() && (github.event.inputs.target_job == 'deploy-minikube' || github.event.inputs.target_job == 'all')
+    if: always() && (github.event.inputs.target_job == 'deploy-minikube' || 
+      github.event.inputs.target_job == 'all')
     runs-on: self-hosted
     steps:
+      - uses: Green-Energy-Org/ecofloc-action/start@v1
+        with:
+          volume: ${{ env.ENERGY_VOLUME }}
+          project-name: ${{ env.PROJECT_NAME }}
+          project-category: ${{ env.PROJECT_CATEGORY }}
       - name: Checkout Code
         uses: actions/checkout@v4
 
@@ -198,10 +266,10 @@ jobs:
         run: |
           # On applique l'overlay minikube directement
           kubectl apply -k k8s/overlays/minikube
-          
+
           # Force le pull de la nouvelle image même si le tag est 'latest'
           kubectl rollout restart deployment/devops-bot
-          
+
           # Attente de la validation
           kubectl rollout status deployment/devops-bot --timeout=300s
 
@@ -210,3 +278,4 @@ jobs:
           echo "🚀 Bot disponible sur :"
           minikube service devops-bot-service --url
 
+      - uses: Green-Energy-Org/ecofloc-action/stop@v1
