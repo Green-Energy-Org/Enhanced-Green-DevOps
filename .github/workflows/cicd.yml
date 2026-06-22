@@ -39,7 +39,7 @@ jobs:
       github.event.inputs.target_job == 'all'
     runs-on: self-hosted
     container:
-      image: ubuntu:22.04
+      image: catthehacker/ubuntu:act-22.04
     steps:
       - uses: Green-Energy-Org/ecofloc-action/start@v1
         with:
